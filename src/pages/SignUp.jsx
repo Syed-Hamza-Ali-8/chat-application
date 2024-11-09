@@ -18,8 +18,6 @@ const fadeIn = keyframes`
   to { opacity: 1; }
 `;
 
-// const auth = getAuth();
-
 const SignupForm = () => {
     const { register, handleSubmit, formState: { errors } } = useForm();
     const [isMounted, setIsMounted] = useState(false);
@@ -36,13 +34,12 @@ const SignupForm = () => {
             const userCredential = await createUserWithEmailAndPassword(auth, email, password);
             const user = userCredential.user;
 
+            alert('User Register Successfully');
             await setDoc(doc(db, "users", user.uid), {
                 email: user.email,
                 createdAt: new Date(),
             });
 
-            console.log('User signed up and saved to Firestore:', user);
-            navigate('/');
         } catch (error) {
             const errorCode = error.code;
             const errorMessage = error.message;

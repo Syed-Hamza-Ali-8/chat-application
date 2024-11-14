@@ -11,7 +11,6 @@ import {
     Toolbar,
     Button,
     Typography,
-    Divider,
     Switch,
 } from '@mui/material';
 import SendIcon from '@mui/icons-material/Send';
@@ -19,20 +18,20 @@ import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { useNavigate } from 'react-router-dom';
 import { getAuth, signOut } from 'firebase/auth';
-import { db } from '../config/firebase-config'; // Adjust the path as per your project structure
+import { db } from '../config/firebase-config';
 import { collection, addDoc, onSnapshot, query, orderBy, doc, updateDoc, deleteDoc, getDoc } from 'firebase/firestore';
 
 const ChatApp = () => {
     const [message, setMessage] = useState('');
     const [messages, setMessages] = useState([]);
     const [users, setUsers] = useState([]);
-    const [selectedUser, setSelectedUser] = useState(null); // Keep track of selected user
+    const [selectedUser, setSelectedUser] = useState(null);
     const [editingMessageId, setEditingMessageId] = useState(null);
     const [isDarkMode, setIsDarkMode] = useState(false);
     const navigate = useNavigate();
     const auth = getAuth();
 
-    // Fetch users from Firestore
+    // Fetch users and store them in 'users' state
     useEffect(() => {
         const unsubscribe = onSnapshot(collection(db, 'users'), (querySnapshot) => {
             const usersArray = [];
@@ -45,21 +44,21 @@ const ChatApp = () => {
         return () => unsubscribe();
     }, []);
 
-    // Fetch the logged-in user after page refresh
+    // Fetch current authenticated user
     useEffect(() => {
         if (auth.currentUser) {
             const fetchUser = async () => {
-                const userRef = doc(db, 'users', auth.currentUser.uid); // Use UID from Firebase auth
+                const userRef = doc(db, 'users', auth.currentUser.uid);
                 const userDoc = await getDoc(userRef);
                 if (userDoc.exists()) {
-                    setSelectedUser(userDoc.data()); // Set the selected user from Firestore
+                    setSelectedUser(userDoc.data());
                 }
             };
             fetchUser();
         }
     }, [auth.currentUser]);
 
-    // Fetch messages from Firestore for the selected user
+    // Fetch messages relevant to the selected user
     useEffect(() => {
         if (selectedUser) {
             const q = query(
@@ -74,21 +73,20 @@ const ChatApp = () => {
                         messagesArray.push({ ...doc.data(), id: doc.id });
                     }
                 });
-                setMessages(messagesArray); // Keep the order intact
+                setMessages(messagesArray);
             });
 
             return () => unsubscribe();
         }
     }, [selectedUser]);
 
-    // Handle sending a message
+    // Send a new message
     const handleSendMessage = async () => {
         if (message.trim() && selectedUser) {
             try {
-                // Add message to Firestore
                 await addDoc(collection(db, 'messages'), {
                     text: message,
-                    sender: auth.currentUser.email, // Replace with actual user email
+                    sender: auth.currentUser.email,
                     receiver: selectedUser.email,
                     timestamp: new Date().toISOString(),
                 });
@@ -99,20 +97,19 @@ const ChatApp = () => {
         }
     };
 
-    // Handle editing a message
+    // Edit an existing message
     const handleEditMessage = async () => {
         if (message.trim() && editingMessageId) {
             try {
                 const messageDoc = doc(db, 'messages', editingMessageId);
                 const messageSnapshot = await getDoc(messageDoc);
-                const originalTimestamp = messageSnapshot.data().timestamp; // Retain the original timestamp
+                const originalTimestamp = messageSnapshot.data().timestamp;
 
                 await updateDoc(messageDoc, {
-                    text: message + " [edited]", // Append "[edited]" to the message text
-                    timestamp: originalTimestamp, // Retain the original timestamp
+                    text: message + " [edited]",
+                    timestamp: originalTimestamp,
                 });
 
-                // Update the local messages state without changing the order
                 setMessages(prevMessages =>
                     prevMessages.map(msg =>
                         msg.id === editingMessageId ? { ...msg, text: message + " [edited]" } : msg
@@ -120,14 +117,14 @@ const ChatApp = () => {
                 );
 
                 setMessage('');
-                setEditingMessageId(null); // Reset the editing state
+                setEditingMessageId(null);
             } catch (error) {
                 console.error('Error updating message: ', error);
             }
         }
     };
 
-    // Handle deleting a message
+    // Delete a message
     const handleDeleteMessage = async (id) => {
         try {
             const messageDoc = doc(db, 'messages', id);
@@ -137,24 +134,24 @@ const ChatApp = () => {
         }
     };
 
-    // Handle sign out
+    // Sign out the user
     const handleSignOut = async () => {
         try {
             await signOut(auth);
-            navigate('/'); // Redirect to login page
+            navigate('/');
         } catch (error) {
             console.error('Sign-out error', error);
         }
     };
 
-    // Handle Enter key press to send message
+    // Handle key press for Enter key
     const handleKeyDown = (e) => {
         if (e.key === 'Enter' && message.trim()) {
-            e.preventDefault(); // Prevents form submission on Enter key press
+            e.preventDefault();
             if (editingMessageId) {
-                handleEditMessage(); // Edit message if editing
+                handleEditMessage();
             } else {
-                handleSendMessage(); // Otherwise send new message
+                handleSendMessage();
             }
         }
     };
@@ -166,24 +163,25 @@ const ChatApp = () => {
 
     return (
         <Box sx={{ display: 'flex', height: '100vh', backgroundColor: isDarkMode ? '#121212' : '#f5f5f5' }}>
-            {/* Left Side - User List */}
+            {/* Sidebar for users */}
             <Box sx={{ width: '250px', backgroundColor: isDarkMode ? '#1c1c1c' : '#0078d4', color: '#fff', padding: '16px' }}>
                 <Typography variant="h6">Users</Typography>
                 <List>
                     {users.map((user) => (
                         <ListItem
                             button
-                            key={user.email}
+                            key={user.email} // Using email as unique key
                             onClick={() => setSelectedUser(user)} // Set selected user
                             sx={{ backgroundColor: selectedUser?.email === user.email ? '#444' : 'transparent', marginBottom: '8px' }}
                         >
-                            <ListItemText primary={user.email} />
+                            {/* Display user name, fallback to email if name is unavailable */}
+                            <ListItemText primary={user.name || user.email} />
                         </ListItem>
                     ))}
                 </List>
             </Box>
 
-            {/* Right Side - Chat Messages */}
+            {/* Main chat window */}
             <Box sx={{ flexGrow: 1, padding: '16px', display: 'flex', flexDirection: 'column' }}>
                 <AppBar position="static" sx={{ backgroundColor: isDarkMode ? '#1c1c1c' : '#0078d4' }}>
                     <Toolbar>
@@ -252,17 +250,22 @@ const ChatApp = () => {
                             <Typography variant="body2" color="textSecondary">No messages yet.</Typography>
                         )}
                     </List>
-                    <Box sx={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <Box sx={{ display: 'flex', gap: '8px' }}>
                         <TextField
-                            fullWidth
                             label="Type a message"
                             variant="outlined"
+                            fullWidth
                             value={message}
                             onChange={(e) => setMessage(e.target.value)}
                             onKeyDown={handleKeyDown}
                             disabled={!selectedUser}
+                            sx={{ backgroundColor: '#fff' }}
                         />
-                        <IconButton onClick={editingMessageId ? handleEditMessage : handleSendMessage} disabled={!message.trim()}>
+                        <IconButton
+                            color="primary"
+                            onClick={editingMessageId ? handleEditMessage : handleSendMessage}
+                            disabled={!message.trim()}
+                        >
                             <SendIcon />
                         </IconButton>
                     </Box>
